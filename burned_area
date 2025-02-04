@@ -1,0 +1,133 @@
+import ee
+import geemap
+
+ee.Authenticate()
+ee.Initialize(project='ee-seuusuario')
+
+grid = ee.FeatureCollection('seuasset')
+
+# Definir o conjunto de dados MODIS
+dataset = ee.ImageCollection('MODIS/061/MCD64A1')\
+    .filter(ee.Filter.date('2023-01-01', '2023-12-31'))
+
+# Selecionar a camada de data de queimadas
+burned_area = dataset.select('BurnDate')
+
+# Definir visualização
+burned_area_vis = {
+    'min': 30.0,
+    'max': 341.0,
+    'palette': ['4e0400', '951003', 'c61503', 'ff1901']
+}
+
+# Criar o mapa
+Map = geemap.Map()
+Map.setCenter(6.746, 46.529, 2)
+
+# Recortar a área de queimadas ao grid do Brasil
+burned_area_clipped = burned_area.map(lambda img: img.clip(grid))
+
+# Adicionar camada recortada de queimadas
+Map.addLayer(burned_area_clipped, burned_area_vis, 'Burned Area')
+
+# Carregar o grid do Brasil
+Map.addLayer(grid, {}, 'Brasil Grid')
+
+# Carregar o grid do Brasil
+Map.addLayer(grid, {}, 'Brasil Grid')
+
+# Exibir o mapa
+Map
+
+import datetime
+# Função para adicionar camadas mensais
+def add_monthly_layers(start_year, start_month, end_year, end_month):
+    for year in range(start_year, end_year + 1):
+        for month in range(start_month, end_month + 1):
+            start_date = f"{year}-{month:02d}-01"
+
+            # Usar datetime para pegar o último dia do mês
+            if month == 12:
+                end_date = f"{year}-{month:02d}-31"
+            else:
+                next_month = month + 1
+                next_month_first_day = datetime.date(year, next_month, 1)
+                last_day_of_month = next_month_first_day - datetime.timedelta(days=1)
+                end_date = last_day_of_month.strftime("%Y-%m-%d")
+
+            dataset = ee.ImageCollection('MODIS/061/MCD64A1')\
+                .filter(ee.Filter.date(start_date, end_date))
+
+            burned_area = dataset.select('BurnDate')
+
+            # Recortar a área de queimadas ao grid do Brasil
+            burned_area_clipped = burned_area.map(lambda img: img.clip(grid))
+
+            burned_area_vis = {
+                'min': 30.0,
+                'max': 341.0,
+                'palette': ['4e0400', '951003', 'c61503', 'ff1901']
+            }
+
+            layer_name = f'{year}-{month:02d}'
+            Map.addLayer(burned_area_clipped, burned_area_vis, layer_name)
+
+# Chamar a função para adicionar camadas mensais
+add_monthly_layers(2023, 1, 2023, 12)
+
+# Carregar o grid do Brasil novamente
+Map.addLayer(grid, {}, 'Brasil Grid')
+
+# Exibir o mapa
+Map
+
+import datetime
+# Recortar a área de queimadas ao grid do Brasil
+burned_area_clipped = burned_area.map(lambda img: img.clip(grid))
+
+# Função para adicionar camadas mensais e exportar como TIF
+def add_monthly_layers_and_export(start_year, start_month, end_year, end_month):
+    for year in range(start_year, end_year + 1):
+        for month in range(start_month, end_month + 1):
+            start_date = f"{year}-{month:02d}-01"
+
+            # Usar datetime para pegar o último dia do mês
+            if month == 12:
+                end_date = f"{year}-{month:02d}-31"
+            else:
+                next_month = month + 1
+                next_month_first_day = datetime.date(year, next_month, 1)
+                last_day_of_month = next_month_first_day - datetime.timedelta(days=1)
+                end_date = last_day_of_month.strftime("%Y-%m-%d")
+
+            dataset = ee.ImageCollection('MODIS/061/MCD64A1')\
+                .filter(ee.Filter.date(start_date, end_date))
+
+            burned_area = dataset.select('BurnDate')
+
+            # Recortar a área de queimadas ao grid do Brasil
+            burned_area_clipped = burned_area.map(lambda img: img.clip(grid))
+
+            # Exportar a imagem mensal recortada para o Google Drive
+            layer_name = f'{year}-{month:02d}'
+            export_task = ee.batch.Export.image.toDrive(
+                image=burned_area_clipped.median(),  # Usando a mediana para representar o mês
+                description=f"Burned_Area_{layer_name}",
+                folder='Burned_Area_TIFs',
+                fileNamePrefix=f"Burned_Area_{layer_name}",
+                region=grid.geometry(),
+                scale=500,  # Ajustar a escala conforme necessário
+                fileFormat='GeoTIFF',
+                maxPixels=1e8
+            )
+
+            export_task.start()
+
+# Chamar a função para adicionar camadas mensais e exportar
+add_monthly_layers_and_export(2023, 1, 2023, 12)
+
+# Carregar o grid do Brasil novamente
+Map.addLayer(grid, {}, 'Brasil Grid')
+
+# Exibir o mapa
+Map
